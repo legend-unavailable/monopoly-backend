@@ -15,6 +15,7 @@ const corsOptions = {
     credentials: true
 }
 app.use(cors(corsOptions));
+app.use(express.json());
 app.use(session({
     secret: 'Baraggan Louisenbairn',
     saveUninitialized: false,
@@ -22,13 +23,12 @@ app.use(session({
     cookie: {
         maxAge: 60000 * 60 * 5,
         httpOnly: true,
-        secure: true,
+        secure: false,
         rolling: true 
     }
 }));
 app.use(passport.initialize());
 app.use(passport.session());
-app.use(express.json());
 app.use(router);
 
 //const server = http.createServer(app);
@@ -38,7 +38,10 @@ mongoose.connect('mongodb://localhost/playerData')
 .then(() => {
     console.log('Connected to DB')})
 .catch(console.log((err) => {
-        console.log(`Error: ${err}`)}))
+        console.log(`Error: ${err}`)})
+      )
+
+
 
 
 //socketSetup(io);

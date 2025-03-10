@@ -19,16 +19,23 @@ router.post(('/login'), (req, res, next) => {
         return res.status(400).json({errors: errs.array});
     }
 
-    passport.authenticate('local', (err, user) => {
+    passport.authenticate('local', (err, user, info) => {
+        
         if(err) return next(err);
-        if(!user) return res.status(401).json({error: 'Invalid email or password'});
+        if(!user) return res.status(401).json({isFound: false, error: 'Invalid email or password'});
 
         req.logIn(user, (err) => {
-            if(err) return next(err);
-            req.session.userID = user.id;
-            req.session.username = user.username;
+            if(err) {
+                return next(err);
+            }            
+
+            req.session.user = {
+                userID: user.id,
+                username: user.username
+            }
             req.session.visited = true;
-            return res.status(200).json({isFound: true});
+
+            return res.status(200).json({isFound: true, session: req.session});
         });
 
     })(req, res, next);

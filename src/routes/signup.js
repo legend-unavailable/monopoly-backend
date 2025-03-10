@@ -16,7 +16,7 @@ router.post(('/signup'), express.json(), userDataValidation, async(req, res) => 
         return res.status(400).json({errs: errs.array});
     }
 
-    const {email, password, username, password2} = req.body;
+    const {email, password, username} = req.body;
     console.log(`email: ${email}, password ${password}, username: ${username}`);
 
     const searchForEmailUser = async() => {

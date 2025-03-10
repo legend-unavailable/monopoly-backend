@@ -3,14 +3,16 @@ import { Strategy } from "passport-local";
 import { User } from "../mongoose/schemas/user.js";
 
 passport.serializeUser((user, done) => {
-    done(null, user.id);
+    done(null, user._id);
 });
 
 passport.deserializeUser(async(id, done) => {
     try {
-        const result = await User.findOne({id});
+        const result = await User.findById(id);
         if (!result) {
-            throw new Error("User not found");
+            console.log("user not found");
+            return done(null, false);
+            
         }
         done(null, result);
     } catch (error) {
