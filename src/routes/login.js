@@ -30,7 +30,7 @@ router.post(('/login'), (req, res, next) => {
             }            
 
             req.session.user = {
-                userID: user.id,
+                userID: user._id,
                 username: user.username
             }
             req.session.visited = true;

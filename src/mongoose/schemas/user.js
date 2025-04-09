@@ -6,6 +6,11 @@ const userSchema = new mongoose.Schema({
   email: { type: mongoose.SchemaTypes.String, required: true, unique: true},
   password: { type: mongoose.SchemaTypes.String, required: true },
   username: { type: mongoose.SchemaTypes.String, required: true },
+
+  activeGames: [{
+    type: mongoose.SchemaTypes.ObjectId,
+    ref: 'Game'
+  }]
 });
 
 export const User = mongoose.model('User', userSchema);

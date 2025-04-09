@@ -7,13 +7,17 @@ import mongoose from 'mongoose'
 import router from './routes/index.js'
 import session from 'express-session';
 import passport from 'passport';
+import gameSocket from './gameSocket.js';
 
 
 const app = express();
+const hServer = http.createServer(app);
+
 const corsOptions = {
     origin: 'http://localhost:5173',
     credentials: true
 }
+const io = new Server(hServer, {cors: corsOptions});
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(session({
@@ -27,12 +31,22 @@ app.use(session({
         rolling: true 
     }
 }));
+app.use((req, res, next) => {
+    req.io = io;
+    next();
+})
 app.use(passport.initialize());
 app.use(passport.session());
 app.use(router);
 
-//const server = http.createServer(app);
-//const io = new Server(server);
+io.on('connection', (socket) => {
+    console.log('new user connected', socket.id);
+    socket.on('disconnect', () => {
+        console.log('user disconnected', socket.id);        
+    });    
+});
+
+gameSocket(io);
 
 mongoose.connect('mongodb://localhost/playerData')
 .then(() => {
@@ -41,18 +55,7 @@ mongoose.connect('mongodb://localhost/playerData')
         console.log(`Error: ${err}`)})
       )
 
-
-
-
-//socketSetup(io);
-
-// app.get(('/'), (req, res) => {
-//     console.log('active');
-//     res.sendStatus(200)
-    
-// })
-
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {console.log(`Running on port ${PORT}`);
+hServer.listen(PORT, () => {console.log(`Running on port ${PORT}`);
 })
