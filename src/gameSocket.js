@@ -58,25 +58,16 @@ const gameSocket = (io) => {
                 if (!isUserInGame) {
                     game.players.push({userID: userID, username: username});
                     await game.save();
-                    socket.join(gameID);
-                    io.to(gameID).emit('playerJoined', {
-                        username, userID, gameID, players: game.players
-                    });
-                    socket.emit('gameJoined', {
-                        gameID,
-                        players: game.players,
-                        gameName: game.name,
-                        hostPlayerID: game.hostPlayerID
-                    });
-                    io.emit('gameUpdated', {gameID: game._id, playerCount: game.players.length})
-                } else {
-                    socket.emit('gameJoined', {
-                        gameID,
-                        players: game.players,
-                        gameName: game.name,
-                        hostPlayerID: game.hostPlayerID
-                    });
                 }
+                const updatedGame = await Game.findById(gameID);
+                io.to(gameID).emit('playersUpdated', {gameID, players: updatedGame.players});
+                socket.emit('gameJoined', {
+                    gameID,
+                    players: updatedGame.players,
+                    gameName: updatedGame.name,
+                    hostPlayerID: updatedGame.hostPlayerID
+                });
+                io.emit('gameUpdated', {gameID: updatedGame._id, playerCount: updatedGame.players.length})
             } catch (err) {
                 socket.emit('joinGameErr', {
                     msg: 'Err joining game',
@@ -93,9 +84,9 @@ const gameSocket = (io) => {
                     socket.emit('readyErr', {msg: 'game not found'});
                     return;
                 }
-                const playerIndex = game.players.findIndex(player => {
+                const playerIndex = game.players.findIndex(player => 
                     player.userID.toString() === userID.toString()
-                });
+                );
                 if (playerIndex !== -1) {
                     game.players[playerIndex].isReady = isReady;
                     await game.save();

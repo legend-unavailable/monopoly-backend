@@ -22,6 +22,7 @@ const playerStateSchema = new mongoose.Schema({
     turnOrder: {type: mongoose.SchemaTypes.Int32, default: 0},
     isBankrupt: {type: mongoose.SchemaTypes.Boolean, default: false},
     quitGameAt: {type: mongoose.SchemaTypes.Date, default: null},
+    isReady: {type: mongoose.SchemaTypes.Boolean, default: false}
 });
 
 const transactionSchema = new mongoose.Schema({
