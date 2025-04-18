@@ -40,7 +40,7 @@ const gameSocket = (io) => {
                     err: err.message
                 });
             }
-        })
+        });
 
         socket.on('joinGameRoom', async(data) => {
             const {gameID, userID, username} = data;
@@ -77,7 +77,7 @@ const gameSocket = (io) => {
         });
 
         socket.on('playerReady', async(data) => {
-            const {gameID, userID, isReady} = data;
+            const {gameID, userID, isReady, mover} = data;
             try {
                 const game = await Game.findById(gameID);
                 if (!game) {
@@ -88,12 +88,21 @@ const gameSocket = (io) => {
                     player.userID.toString() === userID.toString()
                 );
                 if (playerIndex !== -1) {
+                    const isMoverTaken = game.players.some(player => 
+                        player.mover === mover && player.userID.toString() !== userID.toString()
+                    );
+                    if (isMoverTaken) {
+                        socket.emit('readyErr', {msg: 'Mover already taken'});
+                        return;
+                    }
                     game.players[playerIndex].isReady = isReady;
+                    game.players[playerIndex].mover = mover;
                     await game.save();
                     io.to(gameID).emit('playerStatusUpdated', {
                         userID,
                         isReady,
-                        players: game.players
+                        players: game.players,
+                        mover
                     });
                     const allReady = game.players.every(player => player.isReady);
                     if (allReady && game.players.length >= 2) {
@@ -106,7 +115,7 @@ const gameSocket = (io) => {
                     err: err.message
                 });
             }
-        })
+        });
 
         socket.on('leaveGameRoom', async(data) => {
             const{gameID, userID} = data;
@@ -116,8 +125,8 @@ const gameSocket = (io) => {
                 if (!game) {return;}
                 game.players = game.players.filter(player => 
                     player.userID.toString() !== userID.toString()
-                );
-                if (game.hostPlayerID.toString === userID.toString()) {
+                );                
+                if (game.hostPlayerID.toString() === userID.toString()) {                
                     if (game.players.length > 0) {
                         game.hostPlayerID = game.players[0].userID;
                         io.to(gameID).emit('newHostAssigned', {
@@ -151,7 +160,7 @@ const gameSocket = (io) => {
                     gameID: game._id,
                     gameName: game.name,
                     hostUsername: game.players.find(player => {
-                        player.userID.toString() === game,hostPlayerID.toString();
+                        player.userID.toString() === game.hostPlayerID.toString();
                     })?.username,
                     playerCount: game.players.length,
                     hasPassword: !game.password
@@ -160,48 +169,101 @@ const gameSocket = (io) => {
             } catch (err) {
                 socket.emit('gamesListError', {msg: 'err fetching games'});
             }
+        });
 
-            socket.on('sendChatmsg', (data) => {
-                const {gameID, userID, username, msg} = data;
-                io.to(gameID).emit('chatMsg', {
-                    userID, username, msg, timeStamp: new Date()
-                });
-            })
-            
-            socket.on('startGame', async(data) => {
-                const {gameID, hostID} = data;
-                try {
-                    const game = await Game.findById(gameID);
-                    if (!game) {
-                        socket.emit('startGameErr', {msg: 'game not found'});
-                        return;
-                    }
-                    if (game.hostPlayerID.toString() !== hostID.toSring()) {
-                        socket.emit('startGameErr', {msg: 'only the host can start the game'});
-                        return;
-                    }
-                    if (game.players.length < 2) {
-                        socket.emit('startGameErr', {msg: 'need at least 2 players'});
-                        return;
-                    }
-                    game.status = 'playing';
-                    await game.save();
-                    io.to(gameID).emit('gameStarted', {
-                        gameID, players: game.players
-                    });
-                    io.emit('gameRemoved', {gameID});
-                } catch (err) {
-                    socket.emit('startGameErr', {
-                        msg: 'err starting game',
-                        err: err.message
-                    });
+        socket.on('sendChatMsg', (data) => {
+            const {gameID, userID, username, msg} = data;
+            io.to(gameID).emit('chatMsg', {
+                userID, username, msg, timeStamp: new Date()
+            });
+        });
+
+        socket.on('startGame', async(data) => {
+            const {gameID, hostID} = data;
+            try {
+                console.log('startgame received', data);
+                const game = await Game.findById(gameID);                
+                if (!game) {
+                    socket.emit('startGameErr', {msg: 'game not found'});
+                    return;
                 }
-            });
+                if (game.hostPlayerID.toString() !== hostID.toString()) {
+                    socket.emit('startGameErr', {msg: 'only the host can start the game'});
+                    return;
+                }
+                if (game.players.length < 2) {
+                    socket.emit('gameStartErr', {msg: 'need at least 2 players'});
+                    return;
+                }
+                game.status = 'active';
+                await game.save();
+                console.log('broadcasting gamestarted to room:', gameID);
+                io.to(gameID).emit('gameStarted', {
+                    gameID, players: game.players, userID: hostID
+                });
+                io.emit('gameRemoved', {gameID});               
+            } catch (err) {
+                console.log(err);
+                
+                socket.emit('startGameErr', {
+                    msg: 'err starting game'
+                });
+            }
+        });
 
-            socket.on('disconnect', () => {
-
-            });
-        })
-    })
-}
+        socket.on('rollDice', async(data) => {
+            console.log(data);
+            
+            const {gameID, userID, phase} = data;
+            try {
+                const dice = [roll(), roll()];
+                const isDoubles = dice[0] === dice[1];
+                const game = await Game.findById(gameID);
+                if (!game) {
+                    socket.emit('rollDiceErr', {msg: 'game not found'});
+                    return;
+                }
+                const rollEntry = {
+                    playerID: userID,
+                    dice1: dice[0],
+                    dice2: dice[1],
+                    isDoubles,
+                    turnNumber: game.turnCounter,
+                }
+                game.diceRolls.push(rollEntry);
+                if (phase === 'turnOrder') {
+                    const firstRolls = game.players.map(player => {
+                        return game.diceRolls.find(roll => roll.playerID.toString() === player._id.toString());
+                    }).filter(Boolean);
+                    if (firstRolls.length === game.players.length) {
+                        const order = firstRolls.map(roll => ({
+                            playerID: roll.playerID,
+                            total: roll.dice1 + roll.dice2
+                        })).sort((a, b) => b.total = a.total);
+                        order.forEach((entry, index) => {
+                            const player = game.players.find(p => p._id.toString() === entry.playerID.toString());
+                            if(player) player.turnOrder = index;
+                        });
+                        await game.save();
+                        io.to(gameID).emit('turnOrderFinalized', {
+                            order: game.players.map(p => ({
+                                playerID: p._id,
+                                turnOrder: p.turnOrder
+                            }))
+                        });
+                    } else {await game.save();}
+                } else {await game.save();}
+                io.to(gameID).emit('diceRolled', {userID, dice, isDoubles, phase});
+            } catch (err) {
+                console.log("Err rolling dice:", err);
+                socket.emit('rollDiceErr', {msg: 'server err'});                
+            }
+        });
+        const roll = () => {
+            return Math.ceil(Math.random() * 6);
+        }
+        
+        socket.on('disconnect', () => {});
+    });
+};
 export default gameSocket;
