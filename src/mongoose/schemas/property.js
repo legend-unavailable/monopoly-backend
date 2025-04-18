@@ -16,7 +16,8 @@ const propertySchema = new mongoose.Schema({
     rentWithHotel: {type: mongoose.SchemaTypes.Number},
     houseCost: {type: mongoose.SchemaTypes.Number},
     hotelCost: {type: mongoose.SchemaTypes.Number},
-    fortuneExists: {type: mongoose.SchemaTypes.Boolean}
+    fortuneExists: {type: mongoose.SchemaTypes.Boolean},
+    imageKey: {type: mongoose.SchemaTypes.String}
 });
 
 export const Property = mongoose.model('Property', propertySchema);

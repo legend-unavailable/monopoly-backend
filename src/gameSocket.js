@@ -239,7 +239,7 @@ const gameSocket = (io) => {
                         const order = firstRolls.map(roll => ({
                             playerID: roll.playerID,
                             total: roll.dice1 + roll.dice2
-                        })).sort((a, b) => b.total = a.total);
+                        })).sort((a, b) => b.total - a.total);
                         order.forEach((entry, index) => {
                             const player = game.players.find(p => p._id.toString() === entry.playerID.toString());
                             if(player) player.turnOrder = index;
