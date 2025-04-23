@@ -1,9 +1,9 @@
 import mongoose, { mongo } from "mongoose";
 
 const propteryStateSchema = new mongoose.Schema({
-    propertyID: {type: mongoose.SchemaTypes.Number, required: true},
+    propertyID: {type: mongoose.SchemaTypes.Number, ref: 'Property', required: true},
     ownerID: {type: mongoose.SchemaTypes.ObjectId, ref: 'User', default: null},
-    isMortaged: {type: mongoose.SchemaTypes.Boolean, default: false},
+    isMortgaged: {type: mongoose.SchemaTypes.Boolean, default: false},
     amtOfHouses: {type: mongoose.SchemaTypes.Int32, default: 0, min: 0, max: 4},
     hasHotel: {type: mongoose.SchemaTypes.Boolean, default: false},
     turnPurchased: {type: mongoose.SchemaTypes.Int32} 

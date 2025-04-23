@@ -1,5 +1,8 @@
 import { Game } from "./mongoose/schemas/game.js";
+import { Property } from "./mongoose/schemas/property.js";
 import { User } from "./mongoose/schemas/user.js";
+
+const userSocketMap = {}
 
 const gameSocket = (io) => {
     io.on('connection', (socket) => {
@@ -44,6 +47,7 @@ const gameSocket = (io) => {
 
         socket.on('joinGameRoom', async(data) => {
             const {gameID, userID, username} = data;
+            userSocketMap[userID] = socket.id;
             try {
                 const game = await Game.findById(gameID);
                 if (!game) {
@@ -119,6 +123,12 @@ const gameSocket = (io) => {
 
         socket.on('leaveGameRoom', async(data) => {
             const{gameID, userID} = data;
+            for (const [id, sid] of Object.entries(userSocketMap)) {
+                if (sid === socket.id) {
+                    delete userSocketMap[id];
+                    break;
+                }
+            }
             try {
                 socket.leave(gameID);
                 const game = await Game.findById(gameID);
@@ -171,12 +181,12 @@ const gameSocket = (io) => {
             }
         });
 
-        socket.on('sendChatMsg', (data) => {
+        /*socket.on('sendChatMsg', (data) => {
             const {gameID, userID, username, msg} = data;
             io.to(gameID).emit('chatMsg', {
                 userID, username, msg, timeStamp: new Date()
             });
-        });
+        });*/
 
         socket.on('startGame', async(data) => {
             const {gameID, hostID} = data;
@@ -262,6 +272,68 @@ const gameSocket = (io) => {
         const roll = () => {
             return Math.ceil(Math.random() * 6);
         }
+
+        socket.on('sendChatMsg', async (data) => {
+            const {gameID, sender, receiver, msg} = data;
+            console.log('msg', msg);
+            
+            if (!gameID || !sender || !msg) {
+                return socket.emit('chatMsgErr', {msg: 'Invalid chat data'});
+            }
+            const payload = {
+                sender, receiver, msg, gameID
+            };
+            if (receiver == 'all') {
+                console.log('msg to all');                
+                io.to(gameID).emit('chatMsg', payload);
+            }
+            else {
+                await Game.findById(gameID).then(game => {
+                    const target = game.players.find(p => p.username === receiver);
+                    if (target) {
+                        console.log('msg to one');
+                        
+                        const targetSocketID = userSocketMap[target.userID];
+                        if (targetSocketID) {
+                            io.to(targetSocketID).emit('chatMsg', payload);
+                        }
+                    }
+                });
+            }
+            
+        });
+
+        socket.on('propertyPurchased', async(data) => {
+            const {gameID, userID, propertyID} = data;
+            try {
+                const game = await Game.findById(gameID);
+                const player = game.players.find(p => p.userID === userID);
+                const property = game.properties.find(p => p.propertyID === propertyID);
+                if (!player || !property) return;
+                const propertyDetails = await Property.findOne({propertyID});
+                if (!propertyDetails) return;
+                const alreadyOwned = property.ownerID !== null;
+                const canAfford = player.balance >= propertyDetails.priceTag;
+                if (!alreadyOwned && canAfford) {
+                    player.balance -= propertyDetails.priceTag;
+                    property.ownerID = userID;
+                    await game.save();
+                    io.to(gameID).emit('propertyPurchaseUpdate', {
+                        userID, 
+                        propertyID,
+                        newBalance: player.balance,
+                        
+                    });
+                } else {
+                    socket.emit('propertyPurchaseFailed', {
+                        reason: alreadyOwned ? 'Property already owned' : 'insufficient balance'
+                    });
+                }
+            } catch (err) {
+                console.log('err processing property purchase', err);
+                socket.emit('propertyPurchaseFailed', {reason: 'internal server err'});
+            };
+        })
         
         socket.on('disconnect', () => {});
     });

@@ -10,7 +10,7 @@ const propertySchema = new mongoose.Schema({
     },
     position: {type: mongoose.SchemaTypes.Number, required: true, unique: true},
     priceTag: {type: mongoose.SchemaTypes.Number},
-    mortageValue: {type: mongoose.SchemaTypes.Number},
+    mortgageValue: {type: mongoose.SchemaTypes.Number},
     baseRent: {type: mongoose.SchemaTypes.Number},
     rentWithHouses: [mongoose.SchemaTypes.Number],
     rentWithHotel: {type: mongoose.SchemaTypes.Number},
