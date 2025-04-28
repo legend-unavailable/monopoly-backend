@@ -191,7 +191,7 @@ const gameSocket = (io) => {
         socket.on('startGame', async(data) => {
             const {gameID, hostID} = data;
             try {
-                console.log('startgame received', data);
+                
                 const game = await Game.findById(gameID);                
                 if (!game) {
                     socket.emit('startGameErr', {msg: 'game not found'});
@@ -222,7 +222,6 @@ const gameSocket = (io) => {
         });
 
         socket.on('rollDice', async(data) => {
-            console.log(data);
             
             const {gameID, userID, phase} = data;
             try {
@@ -307,21 +306,35 @@ const gameSocket = (io) => {
             const {gameID, userID, propertyID} = data;
             try {
                 const game = await Game.findById(gameID);
-                const player = game.players.find(p => p.userID === userID);
+                const player = game.players.find(p => p.userID.toString() === userID.toString());
                 const property = game.properties.find(p => p.propertyID === propertyID);
+                console.log('list', game.properties.map(p => p.propertyID));
+                
+                console.log('prop exists', property);
+                console.log(!player || !property);
+                
+                
                 if (!player || !property) return;
-                const propertyDetails = await Property.findOne({propertyID});
+                const propertyDetails = await Property.findOne({id: propertyID});
+                console.log('prop deats', propertyDetails);
+                
                 if (!propertyDetails) return;
                 const alreadyOwned = property.ownerID !== null;
                 const canAfford = player.balance >= propertyDetails.priceTag;
+                console.log('b', alreadyOwned, canAfford);
+                
                 if (!alreadyOwned && canAfford) {
                     player.balance -= propertyDetails.priceTag;
                     property.ownerID = userID;
+                    player.location = propertyDetails.position;
                     await game.save();
+                    console.log('winning');
+                    
                     io.to(gameID).emit('propertyPurchaseUpdate', {
                         userID, 
                         propertyID,
                         newBalance: player.balance,
+                        players: game.players,
                         
                     });
                 } else {
@@ -333,6 +346,59 @@ const gameSocket = (io) => {
                 console.log('err processing property purchase', err);
                 socket.emit('propertyPurchaseFailed', {reason: 'internal server err'});
             };
+        });
+
+        socket.on('turnChange', (data) => {
+            const {gameID, nextPlayerID} = data;
+            console.log('in here', data);
+            io.to(gameID).emit('turnChanged', nextPlayerID);
+        })
+
+        socket.on('updateLoc', async(data) => {
+            const {gameID, userID, newPos, player} = data;
+            const game = await Game.findById(gameID);
+            console.log('local', player);
+            console.log('server old', game.players);
+            const me = game.players.find(p => p.userID.toString() === userID.toString());
+            const newPlayer = player.find(p => p.userID === userID);
+            me.moverLevel = newPlayer.moverLevel;
+            me.balance = newPlayer.balance;
+            me.location = newPos;
+            me.inJail = newPlayer.inJail;
+            me.jailTurns = newPlayer.jailTurns;
+            me.hasJailCard = newPlayer.hasJailCard;
+            me.turnOrder = newPlayer.turnOrder;
+            me.isBankrupt = newPlayer.isBankrupt;            
+            await game.save();
+            console.log('server new', game.players);
+            
+            io.to(gameID).emit('updatedLoc', game.players);
+        });
+
+        socket.on('transferMoney', async(data) => {
+            const {payer, owner, amt, gameID} = data;
+            const game = await Game.findById(gameID);
+            const serverPayer = game.players.find(p => p.userID.toString() === payer.userID.toString());
+            const serverOwner = game.players.find(p => p.userID.toString() === owner.userID.toString());
+            serverPayer.balance -= amt;
+            serverOwner.balance += amt;
+            await game.save();
+            io.to(gameID).emit('updatedLoc', game.players);
+        });
+
+        socket.on('updateJail', async(data) => {
+            const {me, gameID, state} = data;
+            const game = await Game.findById(gameID);
+            const player = game.players.find(p => p.userID.toString() === me.userID.toString());
+            if (state === 'free') {
+                player.inJail = false;
+                player.jailTurns = 0;
+            }
+            else if(state === 'update') {
+                player.jailTurns++;
+            }
+            await game.save();
+            io.to(gameID).emit('updatedLoc', game.players);
         })
         
         socket.on('disconnect', () => {});

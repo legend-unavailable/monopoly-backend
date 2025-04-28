@@ -22,7 +22,6 @@ router.get('/game', async(req, res) => {
         const finalProps = game.properties.map(propState => {
             const pState = propState.toObject();
             const base = propertyMap.get(propState.propertyID) || {};
-            console.log(base);
             
             return {
                 ...pState,
