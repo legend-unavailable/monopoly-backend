@@ -1,4 +1,5 @@
 import mongoose, { mongo } from "mongoose";
+import {cardSchema} from './card.js';
 
 const propteryStateSchema = new mongoose.Schema({
     propertyID: {type: mongoose.SchemaTypes.Number, ref: 'Property', required: true},
@@ -22,7 +23,8 @@ const playerStateSchema = new mongoose.Schema({
     turnOrder: {type: mongoose.SchemaTypes.Int32, default: 0},
     isBankrupt: {type: mongoose.SchemaTypes.Boolean, default: false},
     quitGameAt: {type: mongoose.SchemaTypes.Date, default: null},
-    isReady: {type: mongoose.SchemaTypes.Boolean, default: false}
+    isReady: {type: mongoose.SchemaTypes.Boolean, default: false},
+    fortunes: {type: [cardSchema], default: []}
 });
 
 const transactionSchema = new mongoose.Schema({

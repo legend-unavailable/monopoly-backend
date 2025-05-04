@@ -262,7 +262,10 @@ const gameSocket = (io) => {
                         });
                     } else {await game.save();}
                 } else {await game.save();}
-                io.to(gameID).emit('diceRolled', {userID, dice, isDoubles, phase});
+                const me = game.players.find(p => p.userID.toString() === userID.toString());
+                console.log('me', me);
+                
+                io.to(gameID).emit('diceRolled', {me, dice, isDoubles, phase,});
             } catch (err) {
                 console.log("Err rolling dice:", err);
                 socket.emit('rollDiceErr', {msg: 'server err'});                
@@ -274,7 +277,6 @@ const gameSocket = (io) => {
 
         socket.on('sendChatMsg', async (data) => {
             const {gameID, sender, receiver, msg} = data;
-            console.log('msg', msg);
             
             if (!gameID || !sender || !msg) {
                 return socket.emit('chatMsgErr', {msg: 'Invalid chat data'});
@@ -282,15 +284,13 @@ const gameSocket = (io) => {
             const payload = {
                 sender, receiver, msg, gameID
             };
-            if (receiver == 'all') {
-                console.log('msg to all');                
+            if (receiver == 'all') {                
                 io.to(gameID).emit('chatMsg', payload);
             }
             else {
                 await Game.findById(gameID).then(game => {
                     const target = game.players.find(p => p.username === receiver);
                     if (target) {
-                        console.log('msg to one');
                         
                         const targetSocketID = userSocketMap[target.userID];
                         if (targetSocketID) {
@@ -308,27 +308,23 @@ const gameSocket = (io) => {
                 const game = await Game.findById(gameID);
                 const player = game.players.find(p => p.userID.toString() === userID.toString());
                 const property = game.properties.find(p => p.propertyID === propertyID);
-                console.log('list', game.properties.map(p => p.propertyID));
                 
-                console.log('prop exists', property);
-                console.log(!player || !property);
                 
                 
                 if (!player || !property) return;
                 const propertyDetails = await Property.findOne({id: propertyID});
-                console.log('prop deats', propertyDetails);
+                
                 
                 if (!propertyDetails) return;
                 const alreadyOwned = property.ownerID !== null;
                 const canAfford = player.balance >= propertyDetails.priceTag;
-                console.log('b', alreadyOwned, canAfford);
+                
                 
                 if (!alreadyOwned && canAfford) {
                     player.balance -= propertyDetails.priceTag;
                     property.ownerID = userID;
                     player.location = propertyDetails.position;
                     await game.save();
-                    console.log('winning');
                     
                     io.to(gameID).emit('propertyPurchaseUpdate', {
                         userID, 
@@ -350,17 +346,16 @@ const gameSocket = (io) => {
 
         socket.on('turnChange', (data) => {
             const {gameID, nextPlayerID} = data;
-            console.log('in here', data);
             io.to(gameID).emit('turnChanged', nextPlayerID);
         })
 
         socket.on('updateLoc', async(data) => {
             const {gameID, userID, newPos, player} = data;
             const game = await Game.findById(gameID);
-            console.log('local', player);
-            console.log('server old', game.players);
             const me = game.players.find(p => p.userID.toString() === userID.toString());
             const newPlayer = player.find(p => p.userID === userID);
+            const type = ((newPos - me.location) < 2 || (newPos - me.location) > 12) ?
+            null : `rolled ${newPos - me.location}`;
             me.moverLevel = newPlayer.moverLevel;
             me.balance = newPlayer.balance;
             me.location = newPos;
@@ -368,11 +363,10 @@ const gameSocket = (io) => {
             me.jailTurns = newPlayer.jailTurns;
             me.hasJailCard = newPlayer.hasJailCard;
             me.turnOrder = newPlayer.turnOrder;
-            me.isBankrupt = newPlayer.isBankrupt;            
+            me.isBankrupt = newPlayer.isBankrupt; 
+            me.fortunes = newPlayer.fortunes;
             await game.save();
-            console.log('server new', game.players);
-            
-            io.to(gameID).emit('updatedLoc', game.players);
+            io.to(gameID).emit('updatedLoc', {updatedPlayers: game.players, type, player: me});
         });
 
         socket.on('transferMoney', async(data) => {
@@ -383,23 +377,158 @@ const gameSocket = (io) => {
             serverPayer.balance -= amt;
             serverOwner.balance += amt;
             await game.save();
-            io.to(gameID).emit('updatedLoc', game.players);
+            io.to(gameID).emit('updatedLoc', {updatedPlayers: game.players, type: `has paid $${amt} in rent to ${owner.username}`, player: payer});
         });
 
         socket.on('updateJail', async(data) => {
             const {me, gameID, state} = data;
             const game = await Game.findById(gameID);
             const player = game.players.find(p => p.userID.toString() === me.userID.toString());
-            if (state === 'free') {
+            let type = '';
+            if (state === 'free' || state === 'free1') {
+                type = state === 'free1' ?
+                "couldn't escape in time and paid the bail" :
+                'escaped jail';                
                 player.inJail = false;
                 player.jailTurns = 0;
             }
             else if(state === 'update') {
-                player.jailTurns++;
+                player.jailTurns = player.jailTurns + 1;
+                type = "couldn't escape jail"
+            }
+            else if(state === 'bribe') {
+                type = 'bribed the guard and escaped'
+                player.inJail = false;
+                player.jailTurns = 0;
+                player.balance -= 50000;
+                player.location = 8;
+            }
+            console.log(player.jailTurns);
+            
+            await game.save();
+            io.to(gameID).emit('updatedLoc', { updatedPlayers: game.players, type, player});
+        });
+
+        socket.on('card', async(data) => {
+            const {gameID, userID,  val, card, otherPlayer = null} = data;
+            const game = await Game.findById(gameID);
+            const player = game.players.find(p => p.userID.toString() === userID.toString());
+            if (card.actionType === 'collect') {
+                if (card.actionValue === 'upgrade') {
+                    player.moverLevel === 5 ? val += 50000 : player.moverLevel += 2;
+                    player.balance += val;
+                }
+                else if (card.actionValue === 'takeAll') {
+                    let money = 0;
+                    if (card.type !== 'fortune') {
+                        game.players.map(p => {
+                            if (p.userID.toString() !== userID.toString()) {
+                                if (p.moverLevel === 1) {
+                                    
+                                    const amt = card.valueByLevels[0];
+                                    p.balance -= amt;
+                                    money += amt;
+                                }
+                                else if (p.moverLevel === 3) {
+                                    const amt = card.valueByLevels[1];
+                                    p.balance -= amt;
+                                    money += amt;
+                                }
+                                else {
+                                    const amt = card.valueByLevels[2];
+                                    p.balance -= amt;
+                                    money += amt;
+                                }
+                            }
+                        })
+                        player.balance += money;
+                    }
+                    else {
+                        game.players.map(p => 
+                            p.userID.toString() !== userID.toString() ?
+                            p.balance -= val :
+                            p.balance += (val * (game.players.length - 1))
+                        );
+                    }
+                }
+                else if (card.actionValue === 'non') {
+                    player.balance += val;
+                }
+                else if (card.actionValue === 'takeOne') {
+                    game.players.map(p => {
+                        if (p.userID.toString() === userID.toString()) {
+                            p.balance += val;
+                            return;
+                        }
+                        else if (p.userID.toString() === otherPlayer.toString()) {
+                            p.balance -= val;
+                            return;
+                        }
+                        else return;
+                    });
+                }
+            }
+            else if (card.actionType === 'moveTo'){
+                if (card.actionValue === 'five') {
+                    player.balance -= val;
+                }
+            }
+            else if (card.actionType === 'getoutofjail') {
+                player.hasJailCard = true;
+            }
+            else if (card.actionType === 'pay') {
+                if (card.actionValue === 'giveAll') {
+                    game.players.map(p => 
+                        p.userID.toString() === userID.toString() ?
+                        p.balance -= (val * (game.players.length - 1)) :
+                        p.balance += val
+                    );
+                }
+                else if (card.actionValue === 'giveOne') {
+                    game.players.map(p => {
+                        if (p.userID.toString() === userID.toString()) {
+                            p.balance -= val;
+                            return;
+                        }
+                        else if (p.userID.toString() === otherPlayer.toString()) {
+                            p.balance += val;
+                            return;
+                        }
+                        else return;
+                    });
+                }
+                else if (card.actionValue === 'non') {
+                    player.balance -= val;
+                }
+            }
+            else if (card.actionType === 'roll') {
+                player.balance += val;
+            }
+            else if (card.actionType === 'downgrade') {
+                player.moverLevel -= 2;
             }
             await game.save();
-            io.to(gameID).emit('updatedLoc', game.players);
+            io.to(gameID).emit('updatedLoc',{updatedPlayers: game.players, type: null, player});
+        });
+
+        socket.on('removal', async(data) => {
+            const {gameID, cards, type} = data;
+            cards.shift();
+            io.to(gameID).emit('setCard', {cards, type});
+        });
+
+        socket.on('removeF', async(data) => {
+            const {gameID, property} = data;
+            io.to(gameID).emit('deleteFortune', property);
+
+        });
+        socket.on('gameOver', (data) => {
+            const {gameID} = data;
+            console.log('in server');
+            
+            io.to(gameID).emit('gameEnd', gameID);
         })
+
         
         socket.on('disconnect', () => {});
     });

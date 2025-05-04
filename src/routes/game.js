@@ -1,6 +1,7 @@
 import express from 'express'
 import { Game } from '../mongoose/schemas/game.js';
 import { Property } from '../mongoose/schemas/property.js';
+import { Card } from "../mongoose/schemas/card.js";
 
 const router = express.Router();
 
@@ -27,12 +28,31 @@ router.get('/game', async(req, res) => {
                 ...pState,
                 ...base
             };
-        });        
-        res.json({players: game.players, properties: finalProps});
+        });
+        const cards = await Card.find({}).lean();
+        const chances = cards.filter(c => c.type === 'chance');
+        const lifestyles = cards.filter(c => c.type === 'lifestyle'); 
+        const fortunes = cards.filter(c => c.type === 'fortune'); 
+        console.log('fortunes', fortunes);
+        const fo = shuffle(fortunes);
+        console.log('g', fo);
+        
+        
+        
+              
+        res.json({players: game.players, properties: finalProps, chances: shuffle(chances), lifestyles: shuffle(lifestyles), fortunes: shuffle(fortunes)});
     } catch (err) {
         console.log('Failed to fetch game:', err);
         res.status(500).json({err: 'internal server err'});
     }
 });
+
+const shuffle = (arr) => {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[1], arr[j] = arr[j], arr[i]]
+    }
+    return arr;
+}
 
 export default router;
