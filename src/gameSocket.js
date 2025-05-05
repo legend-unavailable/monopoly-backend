@@ -410,6 +410,9 @@ const gameSocket = (io) => {
         });
 
         socket.on('card', async(data) => {
+            console.log('daten', data);
+            let type = null;
+            
             const {gameID, userID,  val, card, otherPlayer = null} = data;
             const game = await Game.findById(gameID);
             const player = game.players.find(p => p.userID.toString() === userID.toString());
@@ -503,23 +506,29 @@ const gameSocket = (io) => {
             }
             else if (card.actionType === 'roll') {
                 player.balance += val;
+                type = 'rolled and won';
             }
             else if (card.actionType === 'downgrade') {
                 player.moverLevel -= 2;
             }
             await game.save();
-            io.to(gameID).emit('updatedLoc',{updatedPlayers: game.players, type: null, player});
+            io.to(gameID).emit('updatedLoc',{updatedPlayers: game.players, type, player});
         });
 
         socket.on('removal', async(data) => {
             const {gameID, cards, type} = data;
             cards.shift();
+            if (type === 'fo') {
+                console.log('fo', cards.length);
+                
+            }
             io.to(gameID).emit('setCard', {cards, type});
         });
 
         socket.on('removeF', async(data) => {
-            const {gameID, property} = data;
-            io.to(gameID).emit('deleteFortune', property);
+            const {gameID, property, fortunes} = data;
+            
+            io.to(gameID).emit('deleteFortune', {property, fortunes});
 
         });
         socket.on('gameOver', (data) => {
@@ -527,6 +536,16 @@ const gameSocket = (io) => {
             console.log('in server');
             
             io.to(gameID).emit('gameEnd', gameID);
+        })
+
+        socket.on('mortage', async(data) => {
+            const {gameID, property, price} = data;
+            const game = await Game.findById(gameID);
+            const player = game.players.find(p => p.userID.toString() === property.ownerID.toString());
+            player.balance += property.mortgageValue + price;
+            await game.save();
+            io.to(gameID).emit('mortgaged', {property, players: game.players});
+
         })
 
         

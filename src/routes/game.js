@@ -40,7 +40,7 @@ router.get('/game', async(req, res) => {
         
         
               
-        res.json({players: game.players, properties: finalProps, chances: shuffle(chances), lifestyles: shuffle(lifestyles), fortunes: shuffle(fortunes)});
+        res.json({players: game.players, properties: finalProps, chances: chances, lifestyles: lifestyles, fortunes: shuffle(fortunes)});
     } catch (err) {
         console.log('Failed to fetch game:', err);
         res.status(500).json({err: 'internal server err'});
@@ -48,11 +48,12 @@ router.get('/game', async(req, res) => {
 });
 
 const shuffle = (arr) => {
+    const meh = arr;
     for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [arr[1], arr[j] = arr[j], arr[i]]
+        [[meh[1], meh[j]] = [meh[j], meh[i]]]
     }
-    return arr;
+    return meh;
 }
 
 export default router;
