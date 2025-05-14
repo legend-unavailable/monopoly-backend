@@ -54,7 +54,9 @@ io.on('connection', (socket) => {
 
 gameSocket(io);
 
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI, {
+    ssl: true
+})
 .then(() => {
     console.log('Connected to DB')})
 .catch(console.log((err) => {
