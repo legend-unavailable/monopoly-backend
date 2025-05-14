@@ -8,7 +8,8 @@ import router from './routes/index.js'
 import session from 'express-session';
 import passport from 'passport';
 import gameSocket from './gameSocket.js';
-import dotenv from 'dotenv'
+import dotenv from 'dotenv';
+import MongoStore from 'connect-mongo';
 
 dotenv.config({path: './db.env'});
 
@@ -27,6 +28,7 @@ app.use(session({
     secret: 'Baraggan Louisenbairn',
     saveUninitialized: false,
     resave: false,
+    store: MongoStore.create({mongoUrl: process.env.MONGODB_URI}),
     cookie: {
         maxAge: 60000 * 60 * 5,
         httpOnly: true,
@@ -52,10 +54,7 @@ io.on('connection', (socket) => {
 
 gameSocket(io);
 
-mongoose.connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-})
+mongoose.connect(process.env.MONGODB_URI)
 .then(() => {
     console.log('Connected to DB')})
 .catch(console.log((err) => {
