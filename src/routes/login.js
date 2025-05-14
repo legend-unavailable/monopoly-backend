@@ -13,7 +13,6 @@ const loginValidation = [
 ];
 
 router.post(('/login'), (req, res, next) => {
-    /*note to self: add code that checks if data is valid*/    
     const errs = validationResult(req);
     if (!errs.isEmpty()) {
         return res.status(400).json({errors: errs.array});

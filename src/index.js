@@ -8,6 +8,9 @@ import router from './routes/index.js'
 import session from 'express-session';
 import passport from 'passport';
 import gameSocket from './gameSocket.js';
+import dotenv from 'dotenv'
+
+dotenv.config({path: './db.env'});
 
 
 const app = express();
@@ -39,6 +42,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.use(router);
 
+console.log("MongoDB URI:", process.env.MONGODB_URI);
 io.on('connection', (socket) => {
     console.log('new user connected', socket.id);
     socket.on('disconnect', () => {
@@ -48,7 +52,10 @@ io.on('connection', (socket) => {
 
 gameSocket(io);
 
-mongoose.connect('mongodb://localhost/playerData')
+mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
 .then(() => {
     console.log('Connected to DB')})
 .catch(console.log((err) => {
