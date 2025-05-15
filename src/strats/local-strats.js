@@ -24,11 +24,15 @@ export default passport.use(
     new Strategy({usernameField: 'email'}, async (email, password, done) => {
         try {
             const findUser = await User.findOne({email});
+            console.log('find user', findUser, email);
+            
             if (!findUser) {
                 console.log('User not found');
                 return done(null, false, {msg: 'Incorrect email'});
             }
             //const isMatch = await bcrypt.compare(passport, findUser.password);
+            console.log('password', findUser.password, password);
+            
             if (findUser.password !== password) {
                 console.log('Incorrect password');
                 return done(null, false, {msg: 'incorrect password'});;
