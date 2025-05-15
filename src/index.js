@@ -35,7 +35,7 @@ app.use(
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       rolling: true,
-      sameSite: none
+      sameSite: 'none'
     },
   })
 );
