@@ -24,18 +24,20 @@ const corsOptions = {
 const io = new Server(hServer, {cors: corsOptions});
 app.use(cors(corsOptions));
 app.use(express.json());
-app.use(session({
-    secret: 'Baraggan Louisenbairn',
+app.use(
+  session({
+    secret: "Baraggan Louisenbairn",
     saveUninitialized: false,
     resave: false,
-    store: MongoStore.create({mongoUrl: process.env.MONGODB_URI}),
+    store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI }),
     cookie: {
-        maxAge: 60000 * 60 * 5,
-        httpOnly: true,
-        secure: false,
-        rolling: true 
-    }
-}));
+      maxAge: 60000 * 60 * 5,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      rolling: true,
+    },
+  })
+);
 app.use((req, res, next) => {
     req.io = io;
     next();

@@ -1,6 +1,7 @@
 import passport from "passport";
 import { Strategy } from "passport-local";
 import { User } from "../mongoose/schemas/user.js";
+import bcrypt from 'bcrypt';
 
 passport.serializeUser((user, done) => {
     done(null, user._id);
@@ -25,10 +26,13 @@ export default passport.use(
         try {
             const findUser = await User.findOne({email});
             if (!findUser) {
-                throw new Error("User not found");
+                console.log('User not found');
+                return done(null, false, {msg: 'Incorrect email'});
             }
-            if (findUser.password !== password) {
-                throw new Error("Incorrect password");
+            const isMatch = await bcrypt.compare(passport, findUser.password);
+            if (!isMatch) {
+                console.log('Incorrect password');
+                return done(null, false, {msg: 'incorrect password'});;
             }
             done(null, findUser);
         } catch (error) {
