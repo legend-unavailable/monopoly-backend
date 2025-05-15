@@ -40,9 +40,8 @@ router.post(('/login'), (req, res, next) => {
     })(req, res, next);
 });
 
-// router.get("/Login", (req, res) => {
-//   return res.sendStatus(200);
-// });
-//test run
+outer.get("/Login", (req, res) => {
+   return res.sendStatus(200);
+ });
  
 export default router;
