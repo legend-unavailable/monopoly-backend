@@ -40,7 +40,7 @@ router.post(('/login'), (req, res, next) => {
     })(req, res, next);
 });
 
-router.get("/Login", (req, res) => {
+router.get("/login", (req, res) => {
    return res.sendStatus(200);
  });
  
