@@ -29,7 +29,7 @@ export default passport.use(
                 return done(null, false, {msg: 'Incorrect email'});
             }
             //const isMatch = await bcrypt.compare(passport, findUser.password);
-            if (findUser.password !== passport) {
+            if (findUser.password !== password) {
                 console.log('Incorrect password');
                 return done(null, false, {msg: 'incorrect password'});;
             }
